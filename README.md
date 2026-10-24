@@ -14,14 +14,14 @@ The server and its admins only ever store ciphertext, wrapped keys and metadata.
 ```bash
 # Backend
 cd backend
-cp .env.example .env        # then edit the values
+cp .env.example .env       
 npm install
-npm run dev                 # API on http://localhost:5000
+npm run dev                
 
 # Frontend (new terminal)
 cd frontend
 npm install
-npm run dev                 # UI on http://localhost:5173
+npm run dev                 
 ```
 
 `backend/.env`:
