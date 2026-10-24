@@ -136,15 +136,6 @@ The script `backend/src/scripts/shard.mongosh.js` shards data by user. Status: s
 | `auditevents` | `{ fileId: hashed }` |
 | `users` | not sharded |
 
-### 3.6 Known limitations
-- A malicious server could swap a public key. The fingerprint shown when sharing lets users check it.
-- Revoking cannot take back a file someone already downloaded.
-- A lost password means lost data. There is no recovery.
-- The server can see metadata: file size, chunk count, timestamps and who shared with whom.
-- The audit log is not tamper-proof.
-- An upload cannot resume after a page refresh. Failed chunks are retried up to 3 times.
-- A script injection (XSS) attack could misuse keys held in memory.
-
 ---
 
 ## 4. How to test
