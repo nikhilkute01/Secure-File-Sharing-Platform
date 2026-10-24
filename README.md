@@ -36,29 +36,9 @@ npm run dev                 # UI on http://localhost:5173
 
 ---
 
-## 2. Features (assignment checklist)
+## 2. Evidence (screenshots)
 
-| Requirement | Status | Where |
-|---|---|---|
-| Client-side AES-256-GCM encryption (Web Crypto) | Done | `frontend/src/crypto/fileCrypto.js`, `uploads.js` |
-| Chunked upload for 1 GB+ files (8 MB chunks, 3 in parallel, per-chunk retry) | Done | `frontend/src/uploads.js`, `backend/src/routes/files.js` |
-| Streaming storage on the server | Done (local disk) | `backend/src/storage/LocalDriver.js` |
-| ACL engine with RBAC (`owner`, `viewer`) | Done | `models/Acl.js`, `middleware/acl.js` |
-| JWT authentication on every file route | Done | `middleware/auth.js` |
-| Key sharing with ECDH P-256 + HKDF + AES-GCM | Done | `frontend/src/crypto/keys.js`, `routes/share.js` |
-| Password-derived keys (PBKDF2 600,000 iterations) | Done | `frontend/src/crypto/keys.js` |
-| Revocation with cascade and key rotation | Done | `routes/share.js` (`/rotate/*`), `frontend/src/rotate.js` |
-| Audit trail `/audit/:fileId` | Done | `routes/audit.js` |
-| Drag-and-drop UI and client-side encrypted PDF preview | Done | `components/Upload.jsx`, `PdfPreview.jsx` |
-| MongoDB sharding by user | Script provided | `backend/src/scripts/shard.mongosh.js` |
-| **Bonus:** MFA (TOTP) for restricted shares | Done | `routes/mfa.js`, `middleware/acl.js` |
-| **Bonus:** Encrypted search | Done (blind index, see section 4.8) | `frontend/src/crypto/search.js`, `POST /files/search` |
-
----
-
-## 3. Evidence (screenshots)
-
-### 3.1 Encrypted on the network
+### 2.1 Encrypted on the network
 The upload request for each file chunk. `Content-Length` is **8,388,636 bytes**, which is one 8 MB chunk
 (8,388,608) plus 28 bytes: a 12-byte random IV and a 16-byte AES-GCM tag. Unencrypted data would be exactly 8,388,608.
 The payload is binary ciphertext.
@@ -70,24 +50,24 @@ search tokens are sent. No real filename and no raw key.
 
 ![Network tab](images/Networktab.png)
 
-### 3.2 What the server stores
+### 2.2 What the server stores
 The MongoDB `files` record. The name is ciphertext (`encryptedName`), search words are opaque tokens, and no file key
 or plaintext appears. The server only sees size, chunk count and timestamps.
 
 ![Database record](images/DBstoredata.png)
 
-### 3.3 Sharing
+### 2.3 Sharing
 Sharing wraps the file key for the recipient with ECDH. The server stores only the wrapped copy. A key fingerprint is
 shown so the two people can confirm the public key was not swapped.
 
 ![Sharing](images/share.png)
 
-### 3.4 Audit log
+### 2.4 Audit log
 Every access is logged with time, user, IP and details, including denied attempts.
 
 ![Audit log](images/Logs.png)
 
-### 3.5 Performance: 1 GB upload
+### 2.5 Performance: 1 GB upload
 Target: a 1 GB upload completes in under 5 minutes.
 
 **Result: a 1 GB file uploaded in 59.1 seconds (about 17.3 MB/s), roughly 5x faster than the 5-minute target.**
@@ -105,9 +85,9 @@ Downloads over 200 MB stream straight to disk in Chrome and Edge.
 
 ---
 
-## 4. Detailed security audit notes
+## 3. Detailed security audit notes
 
-### 4.1 Threat model
+### 3.1 Threat model
 | Who | Can they read files? |
 |---|---|
 | Server operator or admin | No: only ciphertext, wrapped keys and metadata |
@@ -116,7 +96,7 @@ Downloads over 200 MB stream straight to disk in Chrome and Edge.
 | Another logged-in user | No: the ACL check rejects them |
 | A user who was revoked | No new access; rotation also invalidates any key they saved |
 
-### 4.2 Key hierarchy and why
+### 3.2 Key hierarchy and why
 ```
 password --PBKDF2-SHA256 (600k iterations, per-user salt)--> master key
 master key --HKDF--> authKey   (sent to server; bcrypt-hashed again there)
@@ -134,12 +114,12 @@ each file: random AES-256 file key  --wrapped per user via ECDH P-256 + HKDF + A
 - **Private key handling:** it is stored wrapped on the server, unlocked only in the browser, and imported as
   **non-extractable**, so page code can use it but cannot read it back out.
 
-### 4.3 Chunk integrity
+### 3.3 Chunk integrity
 Each chunk is encrypted with a fresh random 12-byte IV, and the chunk index and total count are bound in as
 authenticated data. A malicious server therefore cannot reorder, swap, duplicate or truncate chunks without
 decryption failing. Tested: a flipped byte in a stored chunk makes download fail with a decryption error.
 
-### 4.4 Access control (ACL)
+### 3.4 Access control (ACL)
 - Every file route requires a valid JWT (HS256 pinned, 1-hour expiry). Missing or invalid token returns **401**.
 - `requireAccess` checks for an un-revoked ACL row with an allowed role. Otherwise it returns **403**.
 - The same 403 is returned for "file does not exist" and "not yours", so file ids cannot be probed.
@@ -148,7 +128,7 @@ decryption failing. Tested: a flipped byte in a stored chunk makes download fail
 - Deleting a file revokes every ACL entry (cascade) and removes the stored chunks.
 - File ids and part numbers are validated twice (route and storage driver) to prevent path traversal.
 
-### 4.5 Revocation and key rotation
+### 3.5 Revocation and key rotation
 Revoking removes a user's server-side access immediately, but a user who already saved the file key could still
 decrypt a copy they downloaded earlier. To handle this the owner can **rotate the key**:
 1. The owner's browser downloads each chunk, decrypts it with the old key, and re-encrypts it with a brand-new key.
@@ -159,7 +139,7 @@ decrypt a copy they downloaded earlier. To handle this the owner can **rotate th
 After rotation, a key saved earlier no longer opens the stored ciphertext. Verified by comparing SHA-256 of a chunk
 before and after rotation.
 
-### 4.6 Authentication and abuse protection
+### 3.6 Authentication and abuse protection
 - Login rate limit (30 requests per 15 minutes) and a global rate limit.
 - Login takes the same time for unknown emails (dummy hash) and returns a fake salt for unknown emails, so accounts
   cannot be enumerated.
@@ -168,14 +148,14 @@ before and after rotation.
 - The login token and all keys live only in browser memory, never in localStorage, sessionStorage, IndexedDB or
   cookies. Refreshing the page logs the user out.
 
-### 4.7 MFA for restricted shares (bonus)
+### 3.7 MFA for restricted shares (bonus)
 - TOTP (RFC 6238) with an authenticator app. The secret is encrypted at rest (AES-256-GCM).
 - The owner can mark a share as "Require MFA", and the recipient must have MFA enabled.
 - Access to that file's metadata and chunks needs an `X-MFA-Token`, a 10-minute token tied to the user, obtained after a valid code.
 - The server enforces this, not only the UI (a request without the token returns 401 with `mfaRequired: true`).
 - Code attempts are limited to 10 per 5 minutes per user. MFA events are written to the audit log.
 
-### 4.8 Encrypted search (bonus): what it is and is not
+### 3.8 Encrypted search (bonus): what it is and is not
 Filename words (and their 3 to 12 letter prefixes) are turned into `HMAC-SHA256(searchKey, word)` tokens in the browser.
 The server stores and matches only those tokens, so it never learns filenames or search terms.
 
@@ -183,7 +163,7 @@ This is **searchable symmetric encryption (a blind index)**, not fully homomorph
 search is far too slow for files of this size. Known leakage: the server can see which files share a token and which
 files each query matches. Search covers the files a user uploaded, because the search key is per user.
 
-### 4.9 Storage: local disk instead of Amazon S3
+### 3.9 Storage: local disk instead of Amazon S3
 The assignment allows "Amazon S3 or a local disk simulation". 
 
 **Note:** S3 support is implemented (`S3Driver.js`), but because of server and hosting cost (Amazon S3 needs a paid
@@ -192,7 +172,7 @@ interface, so switching to S3 only needs the `STORAGE` setting and AWS credentia
 code. The S3 driver needs `@aws-sdk/client-s3`, `@aws-sdk/lib-storage` and an S3 bucket or MinIO. It has not been
 tested against a live bucket.
 
-### 4.10 MongoDB sharding by user
+### 3.10 MongoDB sharding by user
 `backend/src/scripts/shard.mongosh.js` shards by user. It must be run against a `mongos` router, and on a plain
 standalone MongoDB it prints a message and exits.
 
@@ -206,7 +186,7 @@ standalone MongoDB it prints a message and exits.
 Trade-off: queries by `fileId` alone on `acls` (share list, revoke all) are sent to every shard.
 Status: script provided; not run on a cluster.
 
-### 4.11 Known limitations (honest list)
+### 3.11 Known limitations (honest list)
 - **Public key substitution:** the server hands out public keys, so a malicious server could substitute one. The
   fingerprint shown when sharing lets two people verify it out of band.
 - **Revocation cannot undo a download:** a user who already saved the decrypted file keeps it. Rotation protects future access only.
@@ -221,7 +201,7 @@ Status: script provided; not run on a cluster.
 
 ---
 
-## 5. How to test
+## 4. How to test
 
 1. Register three users (`test1` owner, `test2` recipient, `test3` stranger).
 2. **Encryption:** upload a text file; in DevTools Network the chunk `Content-Length` is file size + 28 and the payload is binary.
@@ -234,7 +214,7 @@ Status: script provided; not run on a cluster.
 7. **Audit:** open Activity on a file to see uploads, shares, denials and rotations.
 8. **MFA:** enable MFA for test2, share with "Require MFA"; without a code the API returns 401 `mfaRequired`.
 9. **Search:** upload `Secret-Contract_2026.pdf`, search `contr`; the payload contains only opaque tokens.
-10. **Speed:** upload a 1 GB file and record the time shown (see section 3.5). Our result: 59.1 s.
+10. **Speed:** upload a 1 GB file and record the time shown (see section 2.5). Our result: 59.1 s.
 
 Built-in crypto self-test: `cd frontend && node selfTestRun.mjs` prints PASS lines for key derivation, wrapping,
 tamper detection and chunk reordering.
