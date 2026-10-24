@@ -36,7 +36,7 @@ npm run dev
 
 ---
 
-## 2. Evidence (screenshots)
+## 2. Screenshots
 
 ### 2.1 Encrypted on the network
 The upload request for each file chunk. `Content-Length` is **8,388,636 bytes**, which is one 8 MB chunk
@@ -85,7 +85,7 @@ Downloads over 200 MB stream straight to disk in Chrome and Edge.
 
 ---
 
-## 3. Security notes (short version)
+## 3. Security notes
 
 ### 3.1 Who can read your files?
 | Who | Can they read files? |
